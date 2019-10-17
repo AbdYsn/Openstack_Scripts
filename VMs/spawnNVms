@@ -17,12 +17,19 @@ physicalNetwork="datacentre"
 subnetMask="24"
 flavor="m1.small"
 image="mellanox"
+networkMode="default"
 
 while test $# -gt 0; do
   case "$1" in
 
    --vm-name | -vn)
       VMName=$2
+      shift
+      shift
+      ;;
+
+   --network-mode)
+      networkMode=$2
       shift
       shift
       ;;
@@ -122,6 +129,11 @@ while test $# -gt 0; do
 
    --flavor)			The flavor to use to build the vm
 
+   --network-mode)		Specify how to create the networks, it is one of: 
+					-default: creates a network and a subnet for each vm
+					-single: create only one network and one subnet and adds all the Vms to them
+					-vms-only: only creates the ports and the vms on the network specified by network-name
+
       "
       exit
       ;;
@@ -173,6 +185,12 @@ then
    exit 1
 fi
 
+if [[ $networkMode != "default" ]] && [[ $networkMode != "single" ]] && [[ $networkMode != "vms-only" ]]
+then
+   echo "The network mode: $networkMode is not supported, please refer to the help"
+   echo "exiting ...."
+   exit 1
+fi
 end=$start+$length-1
 count1=0
 
@@ -190,20 +208,48 @@ then
 fi
 }
 
-for i in `seq $start $end`; do 
+if [[ $networkMode == "single" ]]
+then
    echo "creating the network"
-   openstack network create $networkName$i --provider-physical-network $physicalNetwork --provider-network-type $networkType --share
-   CheckForErrors
+   if [[ $networkType == "vlan" ]]
+   then
+      openstack network create $networkName --provider-physical-network $physicalNetwork --provider-network-type $networkType --share
+      CheckForErrors
+   else
+      openstack network create $networkName --provider-network-type $networkType --share
+      CheckForErrors
+   fi
    sleep 2
    networkId=`openstack network list --name $networkName$i -f value -c ID`
-  
+
    echo "Creating the subnet"
-   openstack subnet create $subnetName$i --dhcp --network $networkName$i --subnet-range 10.$i.$i.0/$subnetMask
+   openstack subnet create $subnetName$i --dhcp --network $networkName --subnet-range 10.10.10.0/$subnetMask
    CheckForErrors
    sleep 2
+fi
 
+for i in `seq $start $end`; do 
+   if [[ $networkMode == "default" ]]
+      then
+         echo "creating the network"
+      if [[ $networkType == "vlan" ]] || [[ $networkType == "flat" ]]
+      then
+         openstack network create $networkName$i --provider-physical-network $physicalNetwork --provider-network-type $networkType --share
+         CheckForErrors
+      else
+         openstack network create $networkName$i --provider-network-type $networkType --share
+         CheckForErrors
+      fi
+      sleep 2
+      networkId=`openstack network list --name $networkName$i -f value -c ID`
+  
+      echo "Creating the subnet"
+      openstack subnet create $subnetName$i --dhcp --network $networkName$i --subnet-range 10.$i.$i.0/$subnetMask
+      CheckForErrors
+      sleep 2
+   fi
    echo "creating the port"
-   openstack port create $portName$i --vnic-type=$portType --network $networkName$i
+   openstack port create $portName$i --vnic-type=$portType --network $networkName`if [[ $networkMode == "default" ]];then echo $i;fi`
    CheckForErrors
    sleep 2
    
@@ -241,7 +287,7 @@ for i in `seq $start $end`; do
    vmIP=`openstack port list --server $VMName$i -f value -c 'Fixed IP Addresses' |cut -d\' -f2`
    count1=0
    ping_ret_value=0
-   while [[ $count1 -lt 15 ]];do
+   while [[ $count1 -lt 1 ]];do
       count1=$count1+1
       ip netns exec qdhcp-${networkId} ping ${vmIP} -c 3
       ping_ret_value=$?
@@ -256,6 +302,6 @@ for i in `seq $start $end`; do
    done
    if [[ $ping_ret_value -ne 0 ]]; then
      echo "VM $VMName$i is not reachable via IP $vmIP"
-     exit 1
+     #exit 1
    fi
 done
