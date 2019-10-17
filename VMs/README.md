@@ -8,9 +8,64 @@
 <p>
   <br>
 </p>
-<p>- spawnNVms: This script creates N vms each with a new network, subnet, and port. right now it is customized to only build vms with direct ports and the flavor m1.small, but in the future it will be generalized to build any kind on any availability zone (this is used in a tripleO deployment).</p>
-<p>&nbsp; &nbsp; spawnNVms [starting Label] [VMs number] [availability zone index]: this script create N vms with the name formate "vm{Label}" starting from the staring Label and ending with "{Label}+{number of VMs-1}". the name of the networks will be in the format "private_vlan{Label}" and the type is vlan. The name of the subnets is in the format "private_subnet{Label}" and with subnet ranges of format "12.12.{Label}.0/24". The ports are of type direct and have the format "direct{Label}".</p>
-<p>&nbsp; &nbsp; So spawingNVms 0 3 0, will create: one VM with Label=3 on availability zone, computesriov0: "private_vlan3" "private_subnet3" "direct3" "vm3"</p>
+<p>- spawnNVms: This script creates N vms each with a new network, subnet, and port. (this is used in a tripleO deployment).</p>
+<p>&nbsp; &nbsp; spawnNVms [starting Label] [VMs number] [availability zone index]: this script create N vms with the name format "vm{Label}" starting from the staring Label and ending with "{Label}+{number of VMs-1}". the name of the networks will be in the format "private_vlan{Label}" and the type is vlan. The name of the subnets is in the format "private_subnet{Label}" and with subnet ranges of format "12.12.{Label}.0/24". The ports are of type direct and have the format "direct{Label}" if you want other names, you should use the flags to change them.</p>
+<p>spawnNVms [Starting lable] [Vms number] [availability zone index] &lt;options&gt;</p>
+<p>
+  <br>
+</p>
+<p>spawnNVms creates N vms each with a new network, subnet, and port</p>
+<p>
+  <br>
+</p>
+<p>&lt;options&gt;</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--vmname | -vn) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;The VM name befor the label, default is "vm"</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--port-name | -pn) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; The Port name befor the label, default is "direct"</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--port-type) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; The port type to be used, default is "direct"</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--network-name | -nn) &nbsp; &nbsp; &nbsp; &nbsp;The network name befor the label, default is "private_vlan"</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--network-type) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;The network type to be used, default is "vlan"</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--physical-network) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;The vlan physical network, default is "datacentre"</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--subnet-name | -sn) &nbsp; &nbsp; &nbsp; &nbsp; The subnet name befor the label, default is "private_subnet"</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--subnet-mask) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; The subnet mask value to be used in decimal, default is "24"</p>
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; currently the octent form is not supported</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--zone | -az) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;The availability zone name befor the index, if the flag is not used,</p>
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; the index is manduntory, otherwise it can be left empty, the default</p>
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; value is mellanox sriov comput zone</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--image) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; The image to use to build the vm</p>
+<p>
+  <br>
+</p>
+<p>&nbsp; &nbsp;--flavor) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;The flavor to use to build the vm</p>
 <p>
   <br>
 </p>
