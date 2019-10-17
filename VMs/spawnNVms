@@ -287,7 +287,7 @@ for i in `seq $start $end`; do
    vmIP=`openstack port list --server $VMName$i -f value -c 'Fixed IP Addresses' |cut -d\' -f2`
    count1=0
    ping_ret_value=0
-   while [[ $count1 -lt 1 ]];do
+   while [[ $count1 -lt 15 ]];do
       count1=$count1+1
       ip netns exec qdhcp-${networkId} ping ${vmIP} -c 3
       ping_ret_value=$?
@@ -302,6 +302,6 @@ for i in `seq $start $end`; do
    done
    if [[ $ping_ret_value -ne 0 ]]; then
      echo "VM $VMName$i is not reachable via IP $vmIP"
-     #exit 1
+     exit 1
    fi
 done
