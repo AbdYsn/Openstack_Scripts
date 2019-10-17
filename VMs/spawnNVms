@@ -3,8 +3,176 @@ declare -i start
 declare -i length
 declare -i end
 declare -i count1
-start=$1
-length=$2
+declare -i inCount
+az="nova:overcloud-computesriov-"
+azi=""
+azBool="0"
+VMName="vm"
+portName="direct"
+subnetName="private_subnet"
+networkName="private_vlan"
+portType="direct"
+networkType="vlan"
+physicalNetwork="datacentre"
+subnetMask="24"
+flavor="m1.small"
+image="mellanox"
+
+while test $# -gt 0; do
+  case "$1" in
+
+   --vm-name | -vn)
+      VMName=$2
+      shift
+      shift
+      ;;
+
+   --flavor)
+      flavor=$2
+      shift
+      shift
+      ;;
+
+   --image)
+      image=$2
+      shift
+      shift
+      ;;
+
+   --port-name | -pn)
+      portName=$2
+      shift
+      shift
+      ;;
+
+   --port-type)
+      portName=$2
+      shift
+      shift
+      ;;
+
+   --network-name | -nn)
+      networkName=$2
+      shift
+      shift
+      ;;
+
+   --network-type)
+      networkType=$2
+      shift
+      shift
+      ;;
+
+   --physical-network)
+      physicalNetwork=$2
+      shift
+      shift
+      ;;
+
+   --subnet-name | -sn)
+      subnetName=$2
+      shift
+      shift
+      ;;
+
+   --subnet-mask)
+      subnetMask=$2
+      shift
+      shift
+      ;;
+
+   --zone | -az)
+      az=$2
+      azBool="1"
+      shift
+      shift
+      ;;
+
+
+   --help | -h)
+      echo " "
+      echo "spawnNVms [Starting lable] [Vms number] [availability zone index] <options>"
+      echo " "
+      echo "spawnNVms creates N vms each with a new network, subnet, and port"
+      echo " "
+      echo "<options>"
+      echo "
+   --vmname | -vn)		The VM name befor the label, default is \"vm\"
+
+   --port-name | -pn)		The Port name befor the label, default is \"direct\"
+
+   --port-type)			The port type to be used, default is \"direct\"
+
+   --network-name | -nn)	The network name befor the label, default is \"private_vlan\"
+
+   --network-type)              The network type to be used, default is \"vlan\"
+
+   --physical-network)		The vlan physical network, default is \"datacentre\"
+
+   --subnet-name | -sn)		The subnet name befor the label, default is \"private_subnet\"
+
+   --subnet-mask)		The subnet mask value to be used in decimal, default is \"24\"
+				    currently the octent form is not supported
+
+   --zone | -az)		The availability zone name befor the index, if the flag is not used, 
+				    the index is manduntory, otherwise it can be left empty, the default 
+				    value is mellanox sriov comput zone
+
+   --image)			The image to use to build the vm
+
+   --flavor)			The flavor to use to build the vm
+
+      "
+      exit
+      ;;
+   *)
+      if [[ $1 == [0-9]* ]]
+      then
+         if [[ $inCount -eq 0 ]]
+         then
+             start=$1
+             inCount=$inCount+1
+             shift
+         elif [[ $inCount -eq 1 ]]
+         then
+             length=$1
+             inCount=$inCount+1
+             shift
+         elif [[ $inCount -eq 2 ]] && [[ $azBool == "0" ]]
+             then
+             azi=$1
+             inCount=$inCount+1
+             shift
+         else
+             shift
+         fi
+      elif [[ $1 != " " ]]
+      then
+          echo "unknown option $1"
+          echo "exiting ..."
+          exit 1
+      elif [[ $1 == " " ]]
+      then
+          shift
+      else
+          break
+      fi
+      ;;
+  esac
+done
+
+if [[ $length -eq 0 ]]
+then
+   echo "The Number of Vms was not entered, Please enter a one."
+   echo "Exitting ...."
+   exit 1
+elif [[ -z $azi ]] && [[ $azBool == "0" ]]
+then
+   echo "No avaialability Zone index was specified, Please enter a one."
+   echo "Exitting ...."
+   exit 1
+fi
+
 end=$start+$length-1
 count1=0
 
@@ -12,24 +180,45 @@ source overcloudrc
 
 openstack quota set admin --instances -1 --cores -1 --networks -1 --subnets -1 --ports -1 --ram -1
 
+CheckForErrors()
+{
+if [[ $? -ne 0 ]]
+then
+   echo "There is a error in the command"
+   echo "exiting ...."
+   exit 1
+fi
+}
+
 for i in `seq $start $end`; do 
    echo "creating the network"
-   openstack network create private_vlan$i --provider-physical-network datacentre --provider-network-type vlan --share
+   openstack network create $networkName$i --provider-physical-network $physicalNetwork --provider-network-type $networkType --share
+   CheckForErrors
    sleep 2
-   networkId=`openstack network list --name private_vlan$i -f value -c ID`
+   networkId=`openstack network list --name $networkName$i -f value -c ID`
   
    echo "Creating the subnet"
-   openstack subnet create private_subnet$i --dhcp --network private_vlan$i --subnet-range 12.12.$i.0/24
+   openstack subnet create $subnetName$i --dhcp --network $networkName$i --subnet-range 10.$i.$i.0/$subnetMask
+   CheckForErrors
    sleep 2
 
    echo "creating the port"
-   openstack port create direct$i --vnic-type=direct --network private_vlan$i
+   openstack port create $portName$i --vnic-type=$portType --network $networkName$i
+   CheckForErrors
    sleep 2
    
    echo "creating the VM"
    count1=0
-   openstack server create vm$i --flavor 3 --image mellanox --port direct$i --availability-zone nova:overcloud-computesriov-$3.localdomain
-   state=`openstack server show vm$i | grep status | awk '{print $4}'`
+   if [[ $azBool == "0" ]]
+   then
+      openstack server create $VMName$i --flavor $flavor --image $image --port $portName$i --availability-zone $az$azi.localdomain
+      CheckForErrors
+   else
+      openstack server create $VMName$i --flavor $flavor --image $image --port $portName$i --availability-zone $az
+      CheckForErrors
+   fi
+   state=`openstack server show $VMName$i | grep status | awk '{print $4}'`
+   
    while [[ "$state" != "ACTIVE" ]]; do
       count1=$count1+1
       echo "check number $count1 happened and its result is $state"
@@ -38,18 +227,18 @@ for i in `seq $start $end`; do
          echo "checked 15 times and the noode did not become active."
          echo "exiting ...."
          exit 1
-      elif [[ "$state" == "ERROR" ]]
+      elif [[ "$state" == "ERROR" ]] || [[ -z "$state" ]]
       then
-         echo "status of the node vm$i is ERROR"
+         echo "status of the node $VMName$i is $state"
          echo "Exiting"
          exit 1
       fi
       sleep 4
-      state=`openstack server show vm$i | grep status | awk '{print $4}'`
+      state=`openstack server show $VMName$i | grep status | awk '{print $4}'`
    done
    echo "the Node is Active, Waiting 10 seconds"
    sleep 10
-   vmIP=`openstack port list --server vm$i -f value -c 'Fixed IP Addresses' |cut -d\' -f2`
+   vmIP=`openstack port list --server $VMName$i -f value -c 'Fixed IP Addresses' |cut -d\' -f2`
    count1=0
    ping_ret_value=0
    while [[ $count1 -lt 15 ]];do
@@ -66,12 +255,7 @@ for i in `seq $start $end`; do
       fi
    done
    if [[ $ping_ret_value -ne 0 ]]; then
-     echo "VM vm$i is not reachable via IP $vmIP"
+     echo "VM $VMName$i is not reachable via IP $vmIP"
      exit 1
    fi
 done
-
-
-
-
-
