@@ -1,0 +1,77 @@
+#!/bin/bash
+declare -i start
+declare -i length
+declare -i end
+declare -i count1
+start=$1
+length=$2
+end=$start+$length-1
+count1=0
+
+source overcloudrc
+
+openstack quota set admin --instances -1 --cores -1 --networks -1 --subnets -1 --ports -1 --ram -1
+
+for i in `seq $start $end`; do 
+   echo "creating the network"
+   openstack network create private_vlan$i --provider-physical-network datacentre --provider-network-type vlan --share
+   sleep 2
+   networkId=`openstack network list --name private_vlan$i -f value -c ID`
+  
+   echo "Creating the subnet"
+   openstack subnet create private_subnet$i --dhcp --network private_vlan$i --subnet-range 12.12.$i.0/24
+   sleep 2
+
+   echo "creating the port"
+   openstack port create direct$i --vnic-type=direct --network private_vlan$i
+   sleep 2
+   
+   echo "creating the VM"
+   count1=0
+   openstack server create vm$i --flavor 3 --image mellanox --port direct$i --availability-zone nova:overcloud-computesriov-$3.localdomain
+   state=`openstack server show vm$i | grep status | awk '{print $4}'`
+   while [[ "$state" != "ACTIVE" ]]; do
+      count1=$count1+1
+      echo "check number $count1 happened and its result is $state"
+      if [[ $count1 -ge 15 ]]
+      then
+         echo "checked 15 times and the noode did not become active."
+         echo "exiting ...."
+         exit 1
+      elif [[ "$state" == "ERROR" ]]
+      then
+         echo "status of the node vm$i is ERROR"
+         echo "Exiting"
+         exit 1
+      fi
+      sleep 4
+      state=`openstack server show vm$i | grep status | awk '{print $4}'`
+   done
+   echo "the Node is Active, Waiting 10 seconds"
+   sleep 10
+   vmIP=`openstack port list --server vm$i -f value -c 'Fixed IP Addresses' |cut -d\' -f2`
+   count1=0
+   ping_ret_value=0
+   while [[ $count1 -lt 15 ]];do
+      count1=$count1+1
+      ip netns exec qdhcp-${networkId} ping ${vmIP} -c 3
+      ping_ret_value=$?
+      if [[ $ping_ret_value == 0 ]]
+      then
+         echo "VM pinged successfully"
+         break
+      else
+         echo "Was not able to reach the VM"
+         sleep 3
+      fi
+   done
+   if [[ $ping_ret_value -ne 0 ]]; then
+     echo "VM vm$i is not reachable via IP $vmIP"
+     exit 1
+   fi
+done
+
+
+
+
+

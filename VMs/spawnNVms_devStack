@@ -1,0 +1,52 @@
+#!/bin/bash
+declare -i start
+declare -i length
+declare -i end
+declare -i count1
+start=$1
+length=$2
+end=$start+$length-1
+count1=0
+
+source /opt/stack/devstack/openrc admin admin
+
+openstack quota set admin --instances -1 --cores -1 --networks -1 --subnets -1 --ports -1 --ram -1
+
+for i in `seq $start $end`; do 
+   echo "creating the network"
+   openstack network create private_vlan$i --provider-physical-network ibnet --provider-network-type vlan --share
+   sleep 2
+   networkId=`openstack network list --name private_vlan$i -f value -c ID`
+  
+   echo "Creating the subnet"
+   openstack subnet create private_subnet$i --dhcp --network private_vlan$i --subnet-range 12.12.$i.0/24
+   sleep 2
+
+   echo "creating the port"
+   openstack port create direct$i --vnic-type=direct --network private_vlan$i
+   sleep 2
+   
+   echo "creating the VM"
+   count1=0
+   openstack server create vm$i --flavor m1.small --image mellanox --port direct$i #--availability-zone nova:nova-compute
+   state=`openstack server show vm$i | grep status | awk '{print $4}'`
+   while [[ "$state" != "ACTIVE" ]]; do
+      count1=$count1+1
+      echo "check number $count1 happened and its result is $state"
+      if [[ $count1 -ge 15 ]]
+      then
+         echo "checked 15 times and the noode did not become active."
+         echo "exiting ...."
+         exit 1
+      elif [[ "$state" == "ERROR" ]]
+      then
+         echo "status of the node vm$i is ERROR"
+         echo "Exiting"
+         exit 1
+      fi
+      sleep 4
+      state=`openstack server show vm$i | grep status | awk '{print $4}'`
+   done
+   echo "the Node is Active, Waiting 10 seconds"
+   sleep 10
+done

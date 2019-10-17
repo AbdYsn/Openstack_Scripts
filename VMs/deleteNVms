@@ -1,0 +1,147 @@
+#!/bin/bash
+declare -i startL
+declare -i length
+declare -i end
+declare -i inCount
+inCount=0
+portFlag="0"
+networkFlag="0"
+VMName="vm"
+
+while test $# -gt 0; do
+  case "$1" in
+
+   --name)
+      VMName=$2
+      shift
+      shift
+      ;;
+
+   --port | -p)
+      portFlag="1"
+      shift
+      ;;
+
+   --network | -n)
+      networkFlag="1"
+      portFlag="1"
+      shift
+      ;;
+  
+   --help | -h)
+      echo " "
+      echo "deleteNVms [Starting lable] [Vms number] <options>"
+      echo " "
+      echo "DeleteNVms: delete a number of sequent VMs [Vms number] in openstack enviroment starting from [Starting lable]
+           , eg. deleteNVms 0 1: deletes only a VM called \"vm0\" because the lable is 0 and the number is 1"
+      echo " "
+      echo "<options>"
+      echo "	--port | -p:		deletes the first associated port of the vms"
+      echo " "
+      echo "	--network | -n:		deletes the network associated with the port of the vm,
+					if an error happens the command will stop the operation and exit"
+      echo " "
+      echo "	--name			specify the name before the Label, eg. deleteNVms 3 1 --name name, will delete the vm named \"name3\""
+     
+      exit
+      ;;
+
+   *)
+      if [[ $1 == [0-9]* ]]
+      then 
+         if [[ $inCount -eq 0 ]]
+         then
+             startL=$1
+             inCount=$inCount+1
+             shift
+         elif [[ $inCount -eq 1 ]]
+         then
+             length=$1
+             inCount=$inCount+1
+             shift
+         fi
+      elif [[ $1 != " " ]]
+      then 
+          echo "unknown option $1"
+          echo "exiting ..."
+          exit 1
+      elif [[ $1 == "  " ]]
+      then
+          shift
+      else
+          break
+      fi
+      ;;
+  esac
+done
+
+end=$startL+$length-1
+
+#source overcloudrc
+
+for i in `seq $startL $end`; do
+    if [[ $portFlag == "1" ]]
+    then
+       echo "getting things Ready ..."
+       portInfo=`openstack port list --server $VMName$i -f value -c id -c name -c 'Fixed IP Addresses'`
+       portID=`echo $portInfo | cut -d' ' -f1`
+       portName=`echo $portInfo | cut -d' ' -f2`
+       subnetID=`echo $portInfo | grep -o subnet_id='.*' | cut -d\' -f2`
+       if [[ -z "$portID" ]] || [[ -z "$portName" ]] || [[ -z "$subnetID" ]]
+       then
+          echo "error while getting things ready!"
+          echo "exiting ..."
+          exit 1
+       fi
+       if [[ $networkFlag == "1" ]]
+       then
+          networkInfo=`openstack network list | grep $subnetID | cut -d'|' -f2,3`
+          networkID=`echo $networkInfo | cut -d'|' -f1`
+          networkName=`echo $networkInfo | cut -d'|' -f2`
+          if [[ -z "$networkID" ]] || [[ -z "$networkName" ]]
+          then
+             echo "error while getting things ready!"
+             echo "exiting ..."
+             exit 1
+          fi
+       fi
+    fi
+
+    echo "Deleting $VMName$i"
+    openstack server delete $VMName$i
+    if [[ $? -ne 0 ]]
+    then
+       echo "An error happened while deleting the VM"
+       echo "exitting ..."
+       exit 1
+    fi
+    sleep 2
+
+    if [[ $portFlag == "1" ]]
+    then
+       echo "Deleting the port $portName"
+       openstack port delete $portID
+
+       if [[ $? -ne 0 ]]
+       then
+          echo "An error happened while deleting the port"
+          echo "exitting ..."
+          exit 1
+       fi
+    fi
+    sleep 2
+       
+    if [[ $networkFlag == "1" ]]
+    then
+       echo "Deleting the network $networkName"
+       openstack network delete $networkID
+    
+       if [[ $? -ne 0 ]]
+       then
+          echo "An error happened while deleting the network"
+          echo "exitting ..."
+          exit 1
+       fi
+    fi
+    sleep 4
+done 
