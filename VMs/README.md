@@ -76,7 +76,7 @@
 <p>
   <br>
 </p>
-<p>- spawnNVms_devstack: This is the same as spawnNVms, but modified for the devstack environment. in it no availability zone is required, and it is tightly coupled with a particular setup, so for the use of this script you should make sure to change the names of the images, flavors, physical-networks, and any other resources so that it is compatible with your environment. (in the future options to modify these parameters will be added).</p>
+<p>- spawnNVms_devstack: This is the same as spawnNVms, but modified for the devstack environment. in it no availability zone is required, and it is tightly coupled with a particular setup, so for the use of this script you should make sure to change the names of the images, flavors, physical-networks, and any other resources so that it is compatible with your environment.</p>
 <p>
   <br>
 </p>
